@@ -1,12 +1,18 @@
 import { useEffect, useState } from 'react';
-import { getApiBase } from '../apiBase';
+
+// VITE_CODESPACE_NAME must be defined in .env.local, e.g.: VITE_CODESPACE_NAME=my-codespace
+// Falls back to localhost:8000 when unset (local development).
+const codespaceName = import.meta.env.VITE_CODESPACE_NAME;
 
 export default function Leaderboard() {
   const [entries, setEntries] = useState([]);
   const [error, setError] = useState(null);
 
   useEffect(() => {
-    fetch(`${getApiBase()}/api/leaderboard/`)
+    const url = codespaceName
+      ? `https://${codespaceName}-8000.app.github.dev/api/leaderboard/`
+      : 'http://localhost:8000/api/leaderboard/';
+    fetch(url)
       .then((res) => {
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         return res.json();
