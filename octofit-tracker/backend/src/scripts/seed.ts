@@ -1,24 +1,75 @@
 import mongoose from 'mongoose';
 
-const connectionString = process.env.MONGODB_URI || 'mongodb://localhost:27017/octofit_db';
+import { connectToDatabase, isDatabaseConnected } from '../config/database';
+import {
+  sampleActivities,
+  sampleLeaderboard,
+  sampleTeams,
+  sampleUsers,
+  sampleWorkouts,
+} from '../data/sampleData';
+import Activity from '../models/Activity';
+import LeaderboardEntry from '../models/LeaderboardEntry';
+import Team from '../models/Team';
+import User from '../models/User';
+import Workout from '../models/Workout';
 
 /**
  * Seed the octofit_db database with test data
  */
 async function seedDatabase() {
   try {
-    await mongoose.connect(connectionString);
+    await connectToDatabase();
 
-    console.log('Connected to octofit_db');
+    if (!isDatabaseConnected()) {
+      console.log('Seed the octofit_db database with test data requires a running MongoDB instance.');
+      return;
+    }
 
-    // TODO: Add seed data for users, teams, activities, leaderboard, and workouts
+    await Promise.all([
+      Activity.deleteMany({}),
+      LeaderboardEntry.deleteMany({}),
+      Team.deleteMany({}),
+      User.deleteMany({}),
+      Workout.deleteMany({}),
+    ]);
 
-    console.log('Database seeding complete');
-    await mongoose.disconnect();
+    const users = await User.insertMany(sampleUsers.map(({ id: _id, ...user }) => user));
+    const usersByEmail = new Map(users.map((user) => [user.email, user._id]));
+
+    const teams = await Team.insertMany(
+      sampleTeams.map(({ id: _id, memberEmails, ...team }) => ({
+        ...team,
+        members: memberEmails.map((email) => usersByEmail.get(email)),
+      })),
+    );
+    const teamsByName = new Map(teams.map((team) => [team.name, team._id]));
+
+    await Activity.insertMany(
+      sampleActivities.map(({ id: _id, userEmail, loggedAt, ...activity }) => ({
+        ...activity,
+        user: usersByEmail.get(userEmail),
+        loggedAt: new Date(loggedAt),
+      })),
+    );
+
+    await Workout.insertMany(sampleWorkouts.map(({ id: _id, ...workout }) => workout));
+
+    await LeaderboardEntry.insertMany(
+      sampleLeaderboard.map(({ id: _id, userEmail, teamName, ...entry }) => ({
+        ...entry,
+        user: usersByEmail.get(userEmail),
+        team: teamsByName.get(teamName),
+      })),
+    );
+
+    console.log('Seed the octofit_db database with test data complete.');
   } catch (error) {
     console.error('Error seeding database:', error);
-    process.exit(1);
+    process.exitCode = 1;
+  } finally {
+    await mongoose.disconnect();
   }
 }
 
-seedDatabase();
+void seedDatabase();
