@@ -35,8 +35,14 @@ router.post('/register', async (request, response) => {
     const user = await User.create({ name, email, fitnessLevel, goal, favoriteActivity });
     return response.status(201).json(user);
   } catch (error) {
-    return response.status(503).json({
-      message: 'User registration requires an active MongoDB connection.',
+    if (error instanceof Error && 'code' in error && error.code === 11000) {
+      return response.status(409).json({
+        message: 'A user with that email already exists.',
+      });
+    }
+
+    return response.status(500).json({
+      message: 'Unable to save the user profile.',
       error: error instanceof Error ? error.message : 'Unknown error',
     });
   }
